@@ -1,0 +1,472 @@
+<script>
+// Properties
+var cS = 2.06;
+var cL = 4.18;
+var cG = 2.02;
+var hSL=6030; // Delta_h from Solid to Liquid
+var mP=0; // Melting/freezing point
+var hLG = 40800; // delta_H from Liquid to Gas
+var bP=100; // Boiling point
+var g2n = 1/18.02; // Grams to moles
+// Working variables
+var Ti = 0;
+var Tf = 0;
+var m = 0;
+var qT = 0;
+var xS = 0;
+var yS = 0;
+// Canvas/drawing variables
+var cWidth = 1100;
+var cHeight = 600;
+var context;
+var minX = 0;
+var maxX = 1000;
+var VT = 10; 
+var VS = 0.9; // Default: 1
+var HT = 10;
+var HS = 0.9; // Default: 1
+var stepX = 0;
+var stepY = 0;
+
+//-- Init
+function init()
+{
+  cWidth = getWidth()-10;
+  cHeight = getHeight()/2;
+  // Create canvas
+  document.getElementById("main").innerHTML = "<canvas id='myCanvas' width='"+cWidth+"' height='"+cHeight+"' >Your web browser does not support Canvas.</canvas>";
+  // Setup context
+  context= myCanvas.getContext('2d');
+  //setInterval(draw,frameRate);
+  //draw();
+  
+  setInterval(calcQ,100);
+  
+}
+
+function getSettings()
+{
+ cS = parseFloat(document.getElementById("cS").value);
+ cL = parseFloat(document.getElementById("cL").value);
+ cG = parseFloat(document.getElementById("cG").value);
+ hSL=parseFloat(document.getElementById("hSL").value); // Delta_h from Solid to Liquid
+ mP=parseFloat(document.getElementById("mP").value); // Melting/freezing point
+ hLG = parseFloat(document.getElementById("hLG").value); // delta_H from Liquid to Gas
+ bP= parseFloat(document.getElementById("bP").value); // Boiling point
+ g2n = 1/parseFloat(document.getElementById("g2n").value); // Grams to moles
+
+}
+
+function getMass()
+{
+	  m = parseFloat(document.getElementById("m").value);
+}
+
+function getInitial()
+{
+	  Ti = parseFloat(document.getElementById("Ti").value);
+}
+
+function getFinal()
+{
+	  Tf = parseFloat(document.getElementById("Tf").value);
+}
+
+function calcQ()
+{
+
+// Get
+getInitial();
+getFinal();
+getMass();
+getSettings();
+
+// Clear curve
+  document.getElementById("myCanvas").width = cWidth;
+  document.getElementById("myCanvas").height = cHeight;
+  // clear
+  context.clearRect(0,0, cWidth,cHeight);
+  
+  // Clear work
+  document.getElementById("work").innerHTML = "";
+
+// Draw curve
+//-------- Draw Function graph!
+  //context.clearRect(0,0, cWidth,cHeight);
+  context.font="20px Arial";
+  context.beginPath();
+  context.strokeStyle="#FF0000";
+  stepX = cWidth/6;
+  stepY = cHeight/3;
+  
+var Tc = Ti; // curent temperature
+
+qT = 0; // total q
+
+w("<h3>Given:</h3>");
+w("Specific Heat Capacity (c) of Solid = "+cS+"J");
+w("Specific Heat Capacity (c) of Liquid = "+cL+"J");
+w("Specific Heat Capacity (c) of Gas = "+cG+"J");
+w("Change in Enthalpy/Heat Energy (&Delta;H) from Solid to Liquid = "+hSL+"J/mol");
+w("Change in Enthalpy/Heat Energy (&Delta;H) from Liquid to Gas = "+hLG+"J/mol");
+w("Melting/Freezing Point = "+mP+"C");
+w("Boiling Point = "+bP+"C");
+w("");
+
+// Cooling or Heating curve?
+if (Ti>Tf)
+{
+// ------------------------------------------------------------------------------ Cooling curve ------------------------------------------------------------------------------
+  xS = 0;
+  yS = 3;
+  var x = xS*stepX;
+  var y = stepY*yS;
+  context.moveTo((x*HS)+HT,cHeight-((y*VS)+HT));
+  context.strokeText(("T="+Ti+" C"),(x*HS)+HT,cHeight-((y*VS)+HT));
+
+	// Draws a point at the coordinates x,y on the canvas
+	//	context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+w("<h3>Cooling Curve: Calculations:</h3>");
+
+
+if (Tc>bP)
+{
+if (Tf<=bP) 
+{ Ek(m,Tc,bP,"Gas"); Tc=bP;} 
+else 
+{Ek(m,Tc,Tf,"Gas");Tc=Tf;}
+
+}
+if (Tc==bP)
+{
+Ep(m,"Gas","Liquid");
+}
+// bP --> mP
+if (Tf<bP&&Tc>=mP)
+{
+if (Tf<=mP)
+{
+Ek(m,Tc,mP,"Liquid");
+Tc=mP;
+}
+else
+{
+Ek(m,Tc,Tf,"Liquid");
+Tc=Tf;
+}
+
+}
+if (Tc==mP)
+{
+Ep(m,"Liquid","Solid");
+}
+// mP --> Tf
+if (Tf<mP)
+{
+Ek(m,Tc,Tf,"Solid");
+}
+
+}
+else
+{
+// ---------------------------------------------------------------------- Heating curve ------------------------------------------------------------------------
+  xS = 0;
+  yS = 0;
+  var x = xS*stepX;
+  var y = stepY*yS;
+  context.moveTo((x*HS)+HT,cHeight-((y*VS)+HT));
+  context.strokeText(("T="+Ti+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+
+	// Draws a point at the coordinates x,y on the canvas
+	//	context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+	
+w("<h3>Heating Curve: Calculations:</h3>");
+
+// Ti --> 0
+if (Tc<mP)
+{
+if (Tf>=mP) { Ek(m,Tc,mP,"Solid"); } else {Ek(m,Tc,Tf,"Solid");}
+/*
+w("<h4>"+(xS+1)+") Solve for Kinetic Energy of Solid (q):</h4>");
+var qK = (m*cS*(mP-Tc));
+w("qK=m*c*(Tf-Ti)");
+w("qK="+m+"g*"+cS+"J/gC*("+mP+"C-"+Tc+"C)="+qK+"J");
+w("qT=qT+qK="+qT+"J+"+qK+"J");
+qT=qT+qK;
+w("qT="+qT+"J"); 
+xS+=1;
+yS+=1;
+var x = xS*stepX;
+var y = stepY*yS;
+context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("T="+Tc+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("q="+qK+" J"),((x-stepX*0.4)*HS)+HT,cHeight-(((y-stepY*0.5)*VS)+HT));
+w(""); // Space out
+*/
+if (Tf>=mP) { Tc = mP; } else {Tc=Tf}
+}
+
+if (Tc==mP)
+{
+Ep(m,"Solid","Liquid");
+/*
+w("<h4>"+(xS+1)+") Solve for Potential Energy from Solid to Liquid (q):</h4>");
+var qP = (m*g2n)*(hSL);
+w("qP=n&Delta;H=m*[1n/(18.02g/mol)]*&Delta;H");
+w("qP="+m+"g*[1n/(18.02g/mol)]*"+hSL+"J/mol="+qP+"J");
+w("qT=qT+qP="+qT+"J+"+qP+"J");
+qT=qT+qP;
+w("qT="+qT+"J");
+xS+=1;
+yS+=0;
+var x = xS*stepX;
+var y = stepY*yS;
+context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("T="+Tc+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("q="+qP+" J"),((x-stepX*0.5)*HS)+HT,cHeight-(((y-stepY*0.1)*VS)+HT));
+w(""); // Space out
+*/
+Tc = mP;
+}
+
+// 0 --> Tf or 100
+if (Tc>=mP)
+{
+if (Tf>=bP)
+{
+
+if (Tc<bP)
+{
+Ek(m,Tc,bP,"Liquid");
+/*
+// Tf >= 100
+w("<h4>"+(xS+1)+") Solve for Kinetic Energy of Liquid (q):</h4>");
+var qK = (m*cL*(bP-Tc));
+w("qK=m*c*(Tf-Ti)");
+w("qK="+m+"g*"+cL+"J/gC*("+bP+"C-"+Tc+"C)="+qK+"J");
+w("qT=qT+qK="+qT+"J+"+qK+"J");
+qT=qT+qK;
+w("qT="+qT+"J");
+xS+=1;
+yS+=1;
+  var x = xS*stepX;
+  var y = stepY*yS;
+context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("T="+Tc+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("q="+qK+" J"),((x-stepX*0.5)*HS)+HT,cHeight-((((y-stepY*0.1)-stepY*0.5)*VS)+HT));
+ w(""); // Space out
+*/
+Tc = bP;
+
+Ep(m,"Liquid","Gas");
+/*
+w("<h4>"+(xS+1)+") Solve for Potential Energy from Liquid to Gas (q):</h4>");
+var qP = (m*g2n)*(hLG);
+w("qP=n&Delta;H=m*[1n/(18.02g/mol)]*&Delta;H");
+w("qP="+m+"g*[1n/(18.02g/mol)]*"+hLG+"J/mol="+qP+"J");
+w("qT=qT+qP="+qT+"J+"+qP+"J");
+qT=qT+qP;
+w("qT="+qT+"J");
+xS+=1;
+yS+=0;
+  var x = xS*stepX;
+  var y = stepY*yS;
+context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("T="+Tc+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("q="+qP+" J"),((x-stepX*0.5)*HS)+HT,cHeight-(((y-stepY*0.1)*VS)+HT));
+  w(""); // Space out
+*/
+Tc = bP;
+ }
+ 
+ Ek(m,bP,Tf,"Gas");
+ /*
+ w("<h4>"+(xS+1)+") Solve for Kinetic Energy of Gas (q):</h4>");
+var qK = (m*cG*(Tf-bP));
+w("qK=m*c*(Tf-Ti)");
+w("qK="+m+"g*"+cG+"J/gC*("+Tf+"C-"+bP+"C)="+qK+"J");
+w("qT=qT+qK="+qT+"J+"+qK+"J");
+qT=qT+qK;
+w("qT="+qT+"J");
+xS+=1;
+yS+=1;
+  var x = xS*stepX;
+  var y = stepY*yS;
+context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("T="+Tc+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("q="+qK+" J"),((x-stepX*0.5)*HS)+HT,cHeight-((((y-stepY*0.1)-stepY*0.5)*VS)+HT));
+   w(""); // Space out
+*/
+Tc = Tf;
+
+}
+else
+{
+//Tc=Tf;
+if ( Tf>=mP)
+{
+Ek(m,Tc,Tf,"Liquid");
+/*
+// Tf < 100
+w("<h4>"+(xS+1)+") Solve for Kinetic Energy of Liquid (q):</h4>");
+var qK = (m*cL*(Tf-Tc));
+w("qK=m*c*(Tf-Ti)");
+w("qK="+m+"g*"+cL+"J/gC*("+Tf+"C-"+Tc+"C)="+qK+"J");
+w("qT=qT+qK="+qT+"J+"+qK+"J");
+qT=qT+qK;
+w("qT="+qT+"J");
+xS+=1;
+yS+=1;
+var x = xS*stepX;
+var y = stepY*yS;
+context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("T="+Tc+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("q="+qK+" J"),((x-stepX*0.5)*HS)+HT,cHeight-((((y-stepY*0.1)-stepY*0.5)*VS)+HT));
+w(""); // Space out
+*/
+Tc = Tf;
+}
+
+}
+
+}
+
+}
+
+// End drawing curve
+context.stroke();
+
+p("<b>q = <i> "+(qT/1000) + "</i> kJ<b/>");
+}
+
+function Ek(m,i,f,cPhase)
+{
+var c = 0;
+if (cPhase == "Solid"){c = cS;}
+else if (cPhase == "Liquid"){c = cL;}
+else if (cPhase == "Gas"){c = cG;}
+
+w("<h4>"+(xS+1)+") Solve for Kinetic Energy of "+cPhase+" (q):</h4>");
+var qK = (m*c*(f-i));
+w("qK=m*c*(Tf-Ti)");
+w("qK="+m+"g*"+c+"J/gC*("+f+"C-"+i+"C)="+qK+"J");
+w("qT=qT+qK="+qT+"J+"+qK+"J");
+qT=qT+qK;
+w("qT="+qT+"J");
+
+xS+=1; 
+if (f>=i) {yS+=1;}
+else if (f<i) {yS-=1;}
+
+var x = xS*stepX;
+var y = stepY*yS;
+context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("T="+f+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("q="+qK+" J"),((x-stepX*0.4)*HS)+HT,cHeight-(((y-stepY*0.5)*VS)+HT));
+w(""); // Space out
+
+}
+
+function Ep(m,i,f)
+{
+var h = 0;
+if (i=="Solid" && f=="Liquid") {h=hSL;}
+else if (i=="Liquid" && f=="Gas") {h=hLG;}
+else if (i=="Gas" && f=="Liquid") {h=-1*hLG;}
+else if (i=="Liquid" && f=="Solid") {h=-1*hSL;}
+
+w("<h4>"+(xS+1)+") Solve for Potential Energy from "+i+" to "+f+" (q):</h4>");
+var qP = (m*g2n)*(h);
+w("qP=n&Delta;H=m*[1n/("+(1/g2n)+"g/mol)]*&Delta;H");
+w("qP="+m+"g*[1n/("+(1/g2n)+"g/mol)]*"+h+"J/mol="+qP+"J");
+w("qT=qT+qP="+qT+"J+"+qP+"J");
+qT=qT+qP;
+w("qT="+qT+"J");
+xS+=1;
+yS+=0;
+var x = xS*stepX;
+var y = stepY*yS;
+context.lineTo((x*HS)+HT,cHeight-((y*VS)+HT));
+//context.strokeText(("T="+Tf+" C"),((x+stepX*0.1)*HS)+HT,cHeight-((y*VS)+HT));
+context.strokeText(("q="+qP+" J"),((x-stepX*0.5)*HS)+HT,cHeight-(((y-stepY*0.2)*VS)+HT));
+w(""); // Space out
+
+}
+
+function w(work)
+{
+// Print work
+document.getElementById("work").innerHTML = document.getElementById("work").innerHTML + "<br/>" + work;
+}
+
+function p(displayMsg)
+{
+// Print answer
+document.getElementById("answer").innerHTML = displayMsg;
+}
+
+function getWidth()
+  {
+          var x = 0;
+          if (self.innerHeight)
+          {
+                  x = self.innerWidth;
+          }
+          else if (document.documentElement && document.documentElement.clientHeight)
+          {
+                  x = document.documentElement.clientWidth;
+          }
+          else if (document.body)
+          {
+                  x = document.body.clientWidth;
+          }
+          return x;
+  }
+
+  function getHeight()
+  {
+          var y = 0;
+          if (self.innerHeight)
+          {
+                  y = self.innerHeight;
+          }
+          else if (document.documentElement && document.documentElement.clientHeight)
+          {
+                  y = document.documentElement.clientHeight;
+          }
+          else if (document.body)
+          {
+                  y = document.body.clientHeight;
+          }
+          return y;
+  }
+
+</script>
+
+<body onLoad="init();">
+<h1>Heating/Cooling Curves</h1>
+<h2>Change these values:</h2>
+
+Initial temperature (C, Celsius): <input type="number" name="Ti" id="Ti" min="-274" value="110" /> <br/>
+Final temperature (C, Celsius): <input type="number" name="Tf" id="Tf" min="-274" value="-10" /> <br/>
+Mass (grams): <input type="number" name="m" id="m" value="100" /> <br/>
+<!--<button type="button" id="submit" onclick="calcQ()">Calculate Total Energy (q)</button> NOTE: This is automatic now.-->
+
+<br/>
+<h2>Answer:</h2>
+<p id="answer"></p>
+
+<div id="main"></div>
+
+<h2>More Settings:</h2>
+Specific Heat Capacity (c) of Solid (in J/gC): <input type="number" name="cS" id="cS" value="2.06" /> <br/>
+Specific Heat Capacity (c) of Liquid (in J/gC): <input type="number" name="cL" id="cL" value="4.18" /> <br/>
+Specific Heat Capacity (c) of Gas (in J/gC): <input type="number" name="cG" id="cG" value="2.02" /> <br/>
+Change in Enthalpy/Heat Energy (&Delta;H) from Solid to Liquid (in J): <input type="number" name="hSL" id="hSL" value="6030" /> <br/>
+Change in Enthalpy/Heat Energy (&Delta;H) from Liquid to Gas (in J): <input type="number" name="hLG" id="hLG" value="40800" /> <br/>
+Melting Point (in J): <input type="number" name="mP" id="mP" value="0" /> <br/>
+Boiling Point (in J): <input type="number" name="bP" id="bP" value="100" /> <br/>
+Molar Mass (moles): <input type="number" name="g2n" id="g2n" value="18.02" /> <br/>
+
+<div id="work"></div>
+</body>
